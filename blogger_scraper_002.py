@@ -67,7 +67,8 @@ def main(current_page_link, file_to_write):
 			
 			# download full-size images and re-link to local files
 			try:
-				images = re.findall(r'''(<a href=[",'])(http://.*?[jpg,png,gif,bmp,JPG,GIF,PNG,BMP](?=[",']))([",']>)(.*?</a>)''', current_body, re.DOTALL)
+				images = re.findall(r'''(<a href=[",'])(http://.*?[jpg,png,gif,bmp,JPG,GIF,PNG,BMP](?=[",']))(>.*?</a>)''', current_body, re.DOTALL)
+				print images
 			except:
 				images = []
 			
@@ -75,9 +76,15 @@ def main(current_page_link, file_to_write):
 				if not os.path.exists(image_local_folder):
 					os.makedirs(image_local_folder)
 				for image in images:
+					print "image"
+					print image
 					image_remote_location = image[1]
 					image_name = re.split(r"/", image_remote_location)[-1]
+					print "image_name"
+					print image_name
 					image_local_location = os.path.join(image_local_folder, "full-size-" + image_name)
+					print "image local location"
+					print image_local_location
 					current_body = re.sub(image_remote_location, "file://" + image_local_location, current_body)
 					
 					# open page that contains the real link
