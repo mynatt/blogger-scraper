@@ -15,31 +15,80 @@ def main(current_page_link, file_to_write):
 			with contextlib.closing(urllib.urlopen(current_page_link)) as f:
 				current_page_data = f.read()
 		
-			# parse web page
-		
+			##### parse web page
+			
 			next_page_link = re.search(r"(<a class='blog-pager-newer-link' href=')(.*?)(' id='Blog1_blog-pager-newer-link' title='Newer Post'>)", current_page_data)
 			if next_page_link is not None:
 				next_page_link = next_page_link.group(2)
-			current_title = re.search(r"(<h3 class='post-title entry-title' itemprop='name'>\n)(.*?)(\n</h3>)", current_page_data, re.DOTALL).group(2)
-			current_body = re.search(r"(itemprop='description articleBody'>\n)(.*?)(<div style='clear: both;'></div>\n</div>\n<div class='post-footer'>)", current_page_data, re.DOTALL).group(2)
-		
-			# download images and re-link to local files
-		
-			images = re.findall(r'''(src=[",'])(.*?)([",'])''', current_body, re.DOTALL)
-			if images is not []:
-				if not os.path.exists(os.path.join(os.getcwd(), "images")):
-					os.makedirs(os.path.join(os.getcwd(), "images"))
+			
+			try:
+				current_title = re.search(r"(<h3 class='post-title entry-title'.*?>\n)(.*?)(\n</h3>)", current_page_data, re.DOTALL).group(2)
+			except:
+				current_title = ""
+			try:
+				title_link = re.search(r'''(<a.*?>)(.*?)(</a>)''', current_title, re.DOTALL).group(2)
+				current_title = title_link
+			except:
+				pass
+				
+			try:
+				current_body = re.search(r"(class='post-body entry-content'.*?>\n)(.*?)(<div style='clear: both;'></div>\n</div>)", current_page_data, re.DOTALL).group(2)
+			except:
+				current_body = ""
+			
+			# manage folders to put images in
+			
+			short_title = current_title[:40]
+			image_local_folder = os.path.join(os.getcwd(), "images", short_title)
+			
+			# download images and re-link to local files (embedded and thumbnails)
+			try:
+				images = re.findall(r'''(src=[",'])(.*?)([",'])''', current_body, re.DOTALL)
+			except:
+				images = []
+			
+			if images != []:
+				if not os.path.exists(image_local_folder):
+					os.makedirs(image_local_folder)
 				for image in images:
 					image_remote_location = image[1]
 					image_name = re.split(r"/", image_remote_location)[-1]
-					image_local_location = "%(local_path)s/images/%(image_name)s" % {"local_path" : os.getcwd(), "image_name" : image_name}
+					image_local_location = os.path.join(image_local_folder, "thumbnail-" + image_name)
 					current_body = re.sub(image_remote_location, "file://" + image_local_location, current_body)
 				
-					print "        --Now downloading: %s" % image_remote_location
+					print "        --Now downloading thumbnail: %s" % image_remote_location
 					urllib.urlretrieve(image_remote_location, image_local_location)
-		
-			# append to file
-		
+			
+			# download full-size images and re-link to local files
+			try:
+				images = re.findall(r'''(<a href=[",'])(http://.*?[jpg,png,gif,bmp,JPG,GIF,PNG,BMP](?![",']))([",']>)(.*?</a>)''', current_body, re.DOTALL)
+			except:
+				images = []
+			
+			if images != []:
+				if not os.path.exists(image_local_folder):
+					os.makedirs(image_local_folder)
+				for image in images:
+					image_remote_location = image[1]
+					image_name = re.split(r"/", image_remote_location)[-1]
+					image_local_location = os.path.join(image_local_folder, "full-size-" + image_name)
+					current_body = re.sub(image_remote_location, "file://" + image_local_location, current_body)
+					
+					# open page that contains the real link
+					with contextlib.closing(urllib.urlopen(image_remote_location)) as f:
+						image_remote_page_data = f.read() 
+					
+					# find the real image link
+					images = re.findall(r'''(src=[",'])(.*?)([",'])''', image_remote_page_data, re.DOTALL)
+					for image in images:
+						image_remote_location = image[1]
+					
+					print "        --Now downloading full-size image: %s" % image_remote_location	
+					urllib.urlretrieve(image_remote_location, image_local_location)
+			
+			
+			# append title and body to file
+			
 			with open(file_to_write, "a") as f:
 				f.write('<div class="title"><h3>%(title)s</h3></div>\n<br>\n<div class="body">%(body)s</div>\n<br>\n' % {"title" : current_title, "body" : current_body})		
 		
