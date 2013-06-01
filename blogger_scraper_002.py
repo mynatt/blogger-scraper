@@ -3,16 +3,7 @@ import contextlib
 import sys
 import re
 import os
-from HTMLParser import HTMLParser
 
-class TitleParser(HTMLParser):
-	def handle_starttag(self, tag, attrs):
-		for attr in attrs:
-			if attr == ('class', 'blog-pager-newer-link'):
-				self.is_title = True
-	def handle_data(self, data):
-		print "Data     :", data
-titl = MyHTMLParser()
 
 
 
