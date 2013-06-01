@@ -3,6 +3,19 @@ import contextlib
 import sys
 import re
 import os
+from HTMLParser import HTMLParser
+
+class TitleParser(HTMLParser):
+	def handle_starttag(self, tag, attrs):
+		for attr in attrs:
+			if attr == ('class', 'blog-pager-newer-link'):
+				self.is_title = True
+	def handle_data(self, data):
+		print "Data     :", data
+titl = MyHTMLParser()
+
+
+
 
 def main(current_page_link, file_to_write):
 	while True:
@@ -17,15 +30,17 @@ def main(current_page_link, file_to_write):
 		
 			##### parse web page
 			
+			# find link to next page
 			try:
-				next_page_link = re.search(r"(<a class='blog-pager-newer-link' href=')(.*?)(' id='Blog1_blog-pager-newer-link' title='Newer Post'>)", current_page_data)
+				next_page_link = re.search(r"(class='blog-pager-newer-link'.*?href=')(.*?(?=')))", current_page_data)
 				next_page_link = next_page_link.group(2)
 			except:
 				print "Exception on trying to find next page link."
 				next_page_link = None
 			
+			# find title
 			try:
-				current_title = re.search(r"(<h3 class='post-title entry-title'.*?>\n)(.*?)(\n</h3>)", current_page_data, re.DOTALL).group(2)
+				current_title = re.search(r"(<h3.*?class='post-title entry-title'.*?>\n?)(.*?)(\n</h3>)", current_page_data, re.DOTALL).group(2)
 			except:
 				print "Exception on trying to find current title."
 				current_title = ""
@@ -35,7 +50,8 @@ def main(current_page_link, file_to_write):
 				print "Title contained a link, converting to plain text."
 			except:
 				pass
-				
+			
+			# find body				
 			try:
 				current_body = re.search(r"(class='post-body entry-content'.*?>\n)(.*?)(<div style='clear: both;'></div>\n</div>)", current_page_data, re.DOTALL).group(2)
 			except:
