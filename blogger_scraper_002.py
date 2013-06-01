@@ -17,23 +17,29 @@ def main(current_page_link, file_to_write):
 		
 			##### parse web page
 			
-			next_page_link = re.search(r"(<a class='blog-pager-newer-link' href=')(.*?)(' id='Blog1_blog-pager-newer-link' title='Newer Post'>)", current_page_data)
-			if next_page_link is not None:
+			try:
+				next_page_link = re.search(r"(<a class='blog-pager-newer-link' href=')(.*?)(' id='Blog1_blog-pager-newer-link' title='Newer Post'>)", current_page_data)
 				next_page_link = next_page_link.group(2)
+			except:
+				print "Exception on trying to find next page link."
+				next_page_link = None
 			
 			try:
 				current_title = re.search(r"(<h3 class='post-title entry-title'.*?>\n)(.*?)(\n</h3>)", current_page_data, re.DOTALL).group(2)
 			except:
+				print "Exception on trying to find current title."
 				current_title = ""
 			try:
 				title_link = re.search(r'''(<a.*?>)(.*?)(</a>)''', current_title, re.DOTALL).group(2)
 				current_title = title_link
+				print "Title contained a link, converting to plain text."
 			except:
 				pass
 				
 			try:
 				current_body = re.search(r"(class='post-body entry-content'.*?>\n)(.*?)(<div style='clear: both;'></div>\n</div>)", current_page_data, re.DOTALL).group(2)
 			except:
+				print "Exception finding the body text."
 				current_body = ""
 			
 			# manage folders to put images in
@@ -61,7 +67,7 @@ def main(current_page_link, file_to_write):
 			
 			# download full-size images and re-link to local files
 			try:
-				images = re.findall(r'''(<a href=[",'])(http://.*?[jpg,png,gif,bmp,JPG,GIF,PNG,BMP](?![",']))([",']>)(.*?</a>)''', current_body, re.DOTALL)
+				images = re.findall(r'''(<a href=[",'])(http://.*?[jpg,png,gif,bmp,JPG,GIF,PNG,BMP](?=[",']))([",']>)(.*?</a>)''', current_body, re.DOTALL)
 			except:
 				images = []
 			
@@ -97,6 +103,7 @@ def main(current_page_link, file_to_write):
 			current_page_link = next_page_link
 			
 		else:
+			print current_page_link
 			break
 			
 			
