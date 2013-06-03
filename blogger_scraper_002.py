@@ -3,6 +3,9 @@ import contextlib
 import sys
 import re
 import os
+import lxml
+import codecs
+from bs4 import BeautifulSoup
 
 
 
@@ -10,7 +13,7 @@ import os
 
 def main(current_page_link, file_to_write):
 	while True:
-		if current_page_link is not None:
+		if current_page_link != None:
 		
 			# open web page
 			
@@ -18,64 +21,61 @@ def main(current_page_link, file_to_write):
 			print "Now downloading: %s" % current_page_link
 			with contextlib.closing(urllib.urlopen(current_page_link)) as f:
 				current_page_data = f.read()
-		
-			##### parse web page
 			
-			# find link to next page
-			try:
-				next_page_link = re.search(r"(class='blog-pager-newer-link'.*?href=')(.*?(?=')))", current_page_data)
-				next_page_link = next_page_link.group(2)
-			except:
-				print "Exception on trying to find next page link."
-				next_page_link = None
+			soup = BeautifulSoup(current_page_data, "html.parser")
 			
-			# find title
 			try:
-				current_title = re.search(r"(<h3.*?class='post-title entry-title'.*?>\n?)(.*?)(\n</h3>)", current_page_data, re.DOTALL).group(2)
+				current_title = soup.select(".post-title")[0].get_text(strip=True)
 			except:
-				print "Exception on trying to find current title."
+				print "Couldn't find title."
 				current_title = ""
-			try:
-				title_link = re.search(r'''(<a.*?>)(.*?)(</a>)''', current_title, re.DOTALL).group(2)
-				current_title = title_link
-				print "Title contained a link, converting to plain text."
-			except:
-				pass
 			
-			# find body				
 			try:
-				current_body = re.search(r"(class='post-body entry-content'.*?>\n)(.*?)(<div style='clear: both;'></div>\n</div>)", current_page_data, re.DOTALL).group(2)
+				current_body_tags = soup.select(".post-body")[0]
+				current_body = current_body_tags.get_text(strip=True)
 			except:
-				print "Exception finding the body text."
+				print "Couldn't find post body."
 				current_body = ""
+			
+			try:
+				next_page_link = soup.select(".blog-pager-newer-link")[0]['href']
+			except:
+				print "Couldn't find next page link."
+				next_page_link = None
 			
 			# manage folders to put images in
 			
-			short_title = current_title[:40]
+			if current_title != "":
+				short_title = current_title[:40]
+			else:
+				short_title = "untitled_posts"
+			
 			image_local_folder = os.path.join(os.getcwd(), "images", short_title)
 			
 			# download images and re-link to local files (embedded and thumbnails)
 			try:
-				images = re.findall(r'''(src=[",'])(.*?)([",'])''', current_body, re.DOTALL)
+				images = current_body_tags("img")
+				# images = re.findall(r'''(src=[",'])(.*?)([",'])''', current_body, re.DOTALL)
 			except:
+				print "Couldn't find images."
 				images = []
 			
 			if images != []:
 				if not os.path.exists(image_local_folder):
 					os.makedirs(image_local_folder)
-				for image in images:
-					image_remote_location = image[1]
-					image_name = re.split(r"/", image_remote_location)[-1]
-					image_local_location = os.path.join(image_local_folder, "thumbnail-" + image_name)
-					current_body = re.sub(image_remote_location, "file://" + image_local_location, current_body)
-				
-					print "        --Now downloading thumbnail: %s" % image_remote_location
-					urllib.urlretrieve(image_remote_location, image_local_location)
+			for image in images:
+				image_remote_location = image["src"]
+				image_name = re.split(r"/", image_remote_location)[-1]
+				image_local_location = os.path.join(image_local_folder, "thumbnail-" + image_name)
+				image["src"] = u'file://' + image_local_location
+				print "        --Now downloading thumbnail: %s" % image_remote_location
+				urllib.urlretrieve(image_remote_location, image_local_location)
 			
 			# download full-size images and re-link to local files
 			try:
-				images = re.findall(r'''(<a href=[",'])(http://.*?[jpg,png,gif,bmp,JPG,GIF,PNG,BMP](?=[",']))(>.*?</a>)''', current_body, re.DOTALL)
-				print images
+				images = current_body_tags("a", href=re.compile(r"[jpg,png,gif,bmp,JPG,GIF,PNG,BMP]$"))
+				#images = re.findall(r'''(<a href=[",'])(http://.*?[jpg,png,gif,bmp,JPG,GIF,PNG,BMP](?=[",']))(>.*?</a>)''', current_body, re.DOTALL)
+				#print images
 			except:
 				images = []
 			
@@ -83,33 +83,48 @@ def main(current_page_link, file_to_write):
 				if not os.path.exists(image_local_folder):
 					os.makedirs(image_local_folder)
 				for image in images:
-					print "image"
-					print image
-					image_remote_location = image[1]
+					#print "image"
+					#print image
+					image_remote_location = image["href"]
 					image_name = re.split(r"/", image_remote_location)[-1]
-					print "image_name"
-					print image_name
+					#print "image_name"
+					#print image_name
 					image_local_location = os.path.join(image_local_folder, "full-size-" + image_name)
-					print "image local location"
-					print image_local_location
-					current_body = re.sub(image_remote_location, "file://" + image_local_location, current_body)
+					image["href"] = image_local_location
 					
 					# open page that contains the real link
 					with contextlib.closing(urllib.urlopen(image_remote_location)) as f:
 						image_remote_page_data = f.read() 
+					print image_remote_page_data
 					
-					# find the real image link
-					images = re.findall(r'''(src=[",'])(.*?)([",'])''', image_remote_page_data, re.DOTALL)
+					try:
+						image_soup = BeautifulSoup(image_remote_page_data)
+						print image_soup
+						# find the real image link
+					except:
+						print "Not a blogger thumbnail link."
+						break
+					
+					try:
+						image_current_body_tags = image_soup.select(".post-body")[0]
+					except:
+						print "Couldn't find post body."
+						break
+					
+					try:
+						images = image_current_body_tags("img")
+					except:
+						break
+				
 					for image in images:
-						image_remote_location = image[1]
-					
+						image_remote_location = image["href"]
+				
 					print "        --Now downloading full-size image: %s" % image_remote_location	
 					urllib.urlretrieve(image_remote_location, image_local_location)
 			
-			
 			# append title and body to file
 			
-			with open(file_to_write, "a") as f:
+			with codecs.open(file_to_write, "a", encoding='utf-8') as f:
 				f.write('<div class="title"><h3>%(title)s</h3></div>\n<br>\n<div class="body">%(body)s</div>\n<br>\n' % {"title" : current_title, "body" : current_body})		
 		
 			# get ready for next loop
