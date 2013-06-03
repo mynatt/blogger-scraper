@@ -25,14 +25,20 @@ def main(current_page_link, file_to_write):
 			soup = BeautifulSoup(current_page_data, "html.parser")
 			
 			try:
-				current_title = soup.select(".post-title")[0].get_text(strip=True)
+				current_date_tags = soup.select(".date_header")
+			except:
+				print "Couldn't find date."
+				current_date = 
+			
+			try:
+				current_title_tags = soup.select(".post-title")[0]
+				current_title = current_title_tags.get_text(strip=True)
 			except:
 				print "Couldn't find title."
 				current_title = ""
 			
 			try:
 				current_body_tags = soup.select(".post-body")[0]
-				current_body = current_body_tags.get_text(strip=True)
 			except:
 				print "Couldn't find post body."
 				current_body = ""
@@ -73,54 +79,24 @@ def main(current_page_link, file_to_write):
 			
 			# download full-size images and re-link to local files
 			try:
-				images = current_body_tags("a", href=re.compile(r"[jpg,png,gif,bmp,JPG,GIF,PNG,BMP]$"))
-				#images = re.findall(r'''(<a href=[",'])(http://.*?[jpg,png,gif,bmp,JPG,GIF,PNG,BMP](?=[",']))(>.*?</a>)''', current_body, re.DOTALL)
-				#print images
+				full_images = current_body_tags("a", href=re.compile(r"[jpg,png,gif,bmp,JPG,GIF,PNG,BMP]$"))
 			except:
-				images = []
+				full_images = []
 			
-			if images != []:
+			if full_images != []:
 				if not os.path.exists(image_local_folder):
 					os.makedirs(image_local_folder)
-				for image in images:
-					#print "image"
-					#print image
+				for image in full_images:
 					image_remote_location = image["href"]
 					image_name = re.split(r"/", image_remote_location)[-1]
-					#print "image_name"
-					#print image_name
 					image_local_location = os.path.join(image_local_folder, "full-size-" + image_name)
 					image["href"] = image_local_location
-					
-					# open page that contains the real link
-					with contextlib.closing(urllib.urlopen(image_remote_location)) as f:
-						image_remote_page_data = f.read() 
-					print image_remote_page_data
-					
-					try:
-						image_soup = BeautifulSoup(image_remote_page_data)
-						print image_soup
-						# find the real image link
-					except:
-						print "Not a blogger thumbnail link."
-						break
-					
-					try:
-						image_current_body_tags = image_soup.select(".post-body")[0]
-					except:
-						print "Couldn't find post body."
-						break
-					
-					try:
-						images = image_current_body_tags("img")
-					except:
-						break
-				
-					for image in images:
-						image_remote_location = image["href"]
-				
 					print "        --Now downloading full-size image: %s" % image_remote_location	
 					urllib.urlretrieve(image_remote_location, image_local_location)
+			
+			#current_title = current_title_tags.prettify(formatter="html")
+			current_body = current_body_tags.prettify(formatter="html")
+			
 			
 			# append title and body to file
 			
@@ -137,16 +113,20 @@ def main(current_page_link, file_to_write):
 			
 			
 if __name__ == "__main__":
+	
+	try:
+		# get commandline args
 
-	# get commandline args
+		current_page_link = sys.argv[1]
+		file_to_write = sys.argv[2]
 
-	current_page_link = sys.argv[1]
-	file_to_write = sys.argv[2]
+		# ensure file is there
 
-	# ensure file is there
+		with open(file_to_write, "w") as f:
+			f.write("")
 
-	with open(file_to_write, "w") as f:
-		f.write("")
-
-	page_aggregator = []
-	main(current_page_link, file_to_write)
+		page_aggregator = []
+		main(current_page_link, file_to_write)
+	except KeyboardInterrupt:
+		pass
+		
