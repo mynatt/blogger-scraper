@@ -180,10 +180,9 @@ if __name__ == "__main__":
 
 		# ensure file is there
 
-		with open(file_to_write, "w") as f:
-			f.write("")
+		#with open(file_to_write, "w") as f:
+			#f.write("")
 
-		page_aggregator = []
 		main(current_page_link, file_to_write)
 	except KeyboardInterrupt:
 		pass
